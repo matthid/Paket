@@ -570,10 +570,9 @@ type DependenciesFile(fileName,groups:Map<GroupName,DependenciesGroup>, textRepr
                 |> Seq.toList
 
             let resolution =
-                PackageResolver.Resolve(
-                    groupName,
+                PackageResolver.ResolveNew(
                     group.Sources,
-                    getVersionF, 
+                    getVersionF groupName, 
                     getPackageDetailsF, 
                     group.Options.ResolverStrategyForDirectDependencies,
                     group.Options.ResolverStrategyForTransitives,

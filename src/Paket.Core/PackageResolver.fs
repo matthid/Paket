@@ -219,8 +219,169 @@ type UpdateMode =
     | Install
     | UpdateAll
 
+type ResolverUpdateMode =
+    | Nothing
+    | UpdateFiltered of PackageFilter
+    | Install
+    | Update
+
+let (|Created|_|) (v : Lazy<'T>) =
+    if v.IsValueCreated then Some v.Value else None
+
+type Queue<'T> private (front : 'T list, back : 'T list) =
+    let list = lazy (front @ List.rev back)
+
+    static let Q(xs, ys) = Queue<'T>(xs,ys)
+
+    static member OfList xs = Q(xs,[])
+    static member Empty = Q([],[])
+
+    member __.IsEmpty = front.IsEmpty && back.IsEmpty
+    member __.Length = front.Length + back.Length
+
+    member __.Enqueue x =
+        match list with
+        | Created value -> Q(value, [x])
+        | _ -> Q(front, x :: back)
+
+    member __.Dequeue() =
+        match list with
+        | Created [] -> failwith "Queue underflow."
+        | Created (x :: xs) -> x, Q(xs,[])
+        | _ ->
+            match front, back with
+            | [], [] -> failwith "Queue underflow."
+            | [], _ -> Q(list.Value, []).Dequeue()
+            | x::xs, ys -> x, Q(xs,ys)
+
+    member __.ToList() = list.Value
+    override __.ToString () = list.Value.ToString()
+
+module Queue =
+    let inline (|Q|) (q : Queue<_>) = q
+    
+    let empty<'T> = Queue<'T>.Empty
+    let ofList ts = Queue<_>.OfList ts
+    let toList (Q q) = q.ToList()
+    let enqueue (Q q) x = q.Enqueue x
+    let dequeue (Q q) = q.Dequeue()
+
 /// Resolves all direct and transitive dependencies
-let Resolve(groupName:GroupName, sources, getVersionsF, getPackageDetailsF, globalStrategyForDirectDependencies, globalStrategyForTransitives, globalFrameworkRestrictions, (rootDependencies:PackageRequirement Set), updateMode : UpdateMode) =
+let ResolveNew (sources : PackageSource list, 
+                getVersionF : PackageSource list -> ResolverStrategy -> PackageName -> seq<SemVerInfo * PackageSource list>,
+                getPackageDetailsF : PackageSource list -> PackageName -> SemVerInfo -> PackageDetails,
+                globalStrategyForDirectDependencies : ResolverStrategy option, 
+                globalStrategyForTransitives : ResolverStrategy option,
+                globalFrameworkRestrictions : FrameworkRestrictions, 
+                rootDependencies: PackageRequirement Set,
+                updateMode : ResolverUpdateMode) =
+    
+    let packageFilter =
+        match updateMode with
+        | UpdateFiltered f -> Some f
+        | _ -> None
+
+    let openRequirements = rootDependencies |> Set.toList |> Queue.ofList
+    let selectNextRequirement 
+          (conflictHistory:Map<PackageName, int>) 
+          (openRequirements:Set<PackageRequirement>) =
+        match Seq.tryHead openRequirements with
+        | Some head ->
+          let currentMin = ref (Seq.head openRequirements)
+          let currentBoost = ref 0
+          for d in openRequirements do
+              let boost = 
+                  match conflictHistory |> Map.tryFind d.Name with
+                  | Some c -> -c
+                  | _ -> 0
+              if PackageRequirement.Compare(d,!currentMin,packageFilter,boost,!currentBoost) = -1 then
+                  currentMin := d
+                  currentBoost := boost
+          Some (!currentMin, openRequirements |> Set.remove !currentMin)
+        | None -> None
+
+    let getConflicts
+          (knownConflicts : Set<Set<PackageRequirement> * ((SemVerInfo * PackageSource list) list * bool) option>)
+          (filteredVersions:Map<PackageName, ((SemVerInfo * PackageSource list) list * bool)>)
+          (closedRequirements:Set<PackageRequirement>)
+          (openRequirements:Set<PackageRequirement>)
+          (currentRequirement:PackageRequirement) = 
+        let allRequirements = 
+            openRequirements
+            |> Set.filter (fun r -> r.Graph |> List.contains currentRequirement |> not)
+            |> Set.union closedRequirements
+
+        knownConflicts
+        |> Seq.map (fun (conflicts,selectedVersion) ->
+            match selectedVersion with 
+            | None when Set.isSubset conflicts allRequirements -> conflicts
+            | Some(selectedVersion,_) ->
+                let n = (Seq.head conflicts).Name
+                match filteredVersions |> Map.tryFind n with
+                | Some(v,_) when v = selectedVersion && Set.isSubset conflicts allRequirements -> conflicts
+                | _ -> Set.empty
+            | _ -> Set.empty)
+        |> Set.unionMany
+
+    let getSelectedPackageVersion name resolution =
+        (resolution |> Map.tryFind name)
+        |> Option.map (fun r -> r.Version)
+        
+
+    let rec step
+         (conflictHistory:Map<PackageName, int>) 
+         (relax : bool)
+         (filteredVersions:Map<PackageName, ((SemVerInfo * PackageSource list) list * bool)>)
+         (currentResolution:Map<PackageName,ResolvedPackage>)
+         (closedRequirements:Set<PackageRequirement>)
+         (openRequirements:Set<PackageRequirement>) =
+
+      match selectNextRequirement conflictHistory openRequirements with
+      | Some(currentRequirement,stillOpen) ->
+          let availableVersions =
+              match getSelectedPackageVersion currentRequirement.Name currentResolution with
+              | Some version ->
+                  // we already selected a version so we can't pick a different
+                  [version, sources]
+              | None ->
+                  // we didn't select a version yet so all versions are possible
+                  let resolverStrategy = getResolverStrategy globalStrategyForDirectDependencies globalStrategyForTransitives allRequirementsOfCurrentPackage currentRequirement
+                  getVersionF sources resolverStrategy currentRequirement.Name
+                  |> Seq.toList
+
+          let compatibleVersions =
+              // consider only versions, which match the current requirement
+              availableVersions
+              |> List.filter (isInRange currentRequirement.VersionRequirement)
+
+          let sortedVersions =
+              match currentRequirement.ResolverStrategy with
+              | ResolverStrategy.Max -> List.sort compatibleVersions |> List.rev
+              | ResolverStrategy.Min -> List.sort compatibleVersions
+        
+          let mutable conflictState = Resolution.Conflict(stillOpen)
+
+          for versionToExplore in sortedVersions do
+              match conflictState with
+              | Resolution.Conflict _ ->
+                  let packageDetails = getPackageDetails(currentRequirement.Name,versionToExplore)
+                
+                  conflictState <- 
+                      step(Set.add packageDetails selectedPackageVersions,
+                           Set.add currentRequirement closedRequirements,
+                           addDependenciesToOpenSet(packageDetails,closedRequirements,stillOpen))
+              | Resolution.Ok _ -> ()
+
+          conflictState
+      | None ->
+          // we are done - return the selected versions
+        Resolution.Ok(selectedPackageVersions)
+
+    step ()
+
+let Resolve(groupName:GroupName, sources, getVersionsF, getPackageDetailsF, globalStrategyForDirectDependencies, 
+            globalStrategyForTransitives, globalFrameworkRestrictions, (rootDependencies:PackageRequirement Set), 
+            updateMode : UpdateMode) =
     tracefn "Resolving packages for group %O:" groupName
     let lastConflictReported = ref DateTime.Now
 

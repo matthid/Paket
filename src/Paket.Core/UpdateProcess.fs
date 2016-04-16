@@ -129,7 +129,7 @@ let selectiveUpdate force getSha1 getSortedVersionsF getPackageDetailsF (lockFil
             DependencyChangeDetection.GetPreferredNuGetVersions(dependenciesFile,lockFile)
             |> Map.map (fun k (v,s) -> v,[s])
 
-        let getVersionsF sources resolverStrategy groupName packageName = 
+        let getVersionsF groupName sources resolverStrategy packageName = 
             seq { 
                 match preferredVersions |> Map.tryFind (groupName, packageName), resolverStrategy with
                 | Some x, ResolverStrategy.Min -> yield x
