@@ -38,6 +38,13 @@ GITHUB
   specs:
     modules/Octokit/Octokit.fsx (59dfade480c5f9107107f11af366aaae1f4a9157)
       Octokit
+GROUP ScriptBuilder
+NUGET
+  remote: https://www.nuget.org/api/v2
+  specs:
+    Mono.Cecil (0.9.6.1)
+    QuickGraph (3.6.61119.7)
+
 GROUP Test
 NUGET
   remote: https://www.nuget.org/api/v2
