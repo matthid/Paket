@@ -94,7 +94,7 @@ module ScriptGeneration =
 
     let dllFiles =
       if packageName.GetCompareString().ToLowerInvariant() = "fsharp.core" then
-        List.empty
+        []
       else
         getDllsWithinPackage input.Framework input.PackageInstallModel
 
