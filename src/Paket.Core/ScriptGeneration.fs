@@ -77,7 +77,7 @@ module ScriptGeneration =
       IncludeScriptsRootFolder     : DirectoryInfo
       DependentScripts             : FileInfo seq
       FrameworkReferences          : string seq
-      OrderedRealtiveDllReferences : string seq
+      OrderedRelativeDllReferences : string seq
   }
 
   let makeRelativePath (scriptFile: FileInfo) (libFile: FileInfo) =
@@ -97,7 +97,7 @@ module ScriptGeneration =
 
     let dllLines =
       if packageName.ToLowerInvariant() = "fsharp.core"
-      then Seq.empty else input.OrderedRealtiveDllReferences
+      then Seq.empty else input.OrderedRelativeDllReferences
       |> Seq.map (sprintf """#r "%s" """)
 
     depLines
@@ -118,7 +118,7 @@ module ScriptGeneration =
       |> Seq.map (sprintf """#r "%s" """)
 
     let dllLines =
-      input.OrderedRealtiveDllReferences
+      input.OrderedRelativeDllReferences
       |> Seq.map (sprintf """#r "%s" """)
 
     depLines
@@ -180,7 +180,7 @@ module ScriptGeneration =
                   PackagesOrGroupFolder        = packagesOrGroupFolder
                   IncludeScriptsRootFolder     = includeScriptsRootFolder
                   FrameworkReferences          = getFrameworkReferencesWithinPackage installModel
-                  OrderedRealtiveDllReferences = dllFiles
+                  OrderedRelativeDllReferences = dllFiles
                   DependentScripts             = dependencies
               }
         
