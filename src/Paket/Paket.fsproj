@@ -100,7 +100,7 @@
     <StartWorkingDirectory>D:\code\Paket\integrationtests\scenarios\i000346-aliases\temp</StartWorkingDirectory>
     <StartWorkingDirectory>D:\code\Paket\integrationtests\scenarios\i001585-websharper-props\temp</StartWorkingDirectory>
     <StartArguments>generate-include-scripts -v</StartArguments>
-    <StartWorkingDirectory>C:\dev\src\projects\github.com\fsprojects\Paket\bin</StartWorkingDirectory>
+    <StartWorkingDirectory>C:\dev\src\github.com\fsprojects\Paket\integrationtests\scenarios\loading-scripts-scenarios\fails\temp</StartWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
