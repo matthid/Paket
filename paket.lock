@@ -29,7 +29,7 @@ NUGET
       Microsoft.Bcl (>= 1.1.10)
       Microsoft.Bcl.Build (>= 1.0.14)
     Octokit (0.19)
-      Microsoft.Net.Http
+      Microsoft.Net.Http  - framework: net10, net11, net20, net30, net35, net40, net40-full
 GITHUB
   remote: fsharp/FAKE
     modules/Octokit/Octokit.fsx (3bf706bd6058733a1a034755741076b3953aaf09)
