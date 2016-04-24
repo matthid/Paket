@@ -342,7 +342,7 @@ let generateIncludeScripts (results : ParseResults<GenerateIncludeScriptsArgs>) 
         | _ -> DotNetFramework (FrameworkVersion.V4_5) // paket.exe is compiled for framework 4.5
     )
     let tupleMap f v = (v, f v)
-    let failMatchParameters toParse parsed f message =
+    let failOnMismatch toParse parsed f message =
         if List.length toParse <> List.length parsed then
             toParse
             |> Seq.map (tupleMap f)
@@ -355,7 +355,7 @@ let generateIncludeScripts (results : ParseResults<GenerateIncludeScriptsArgs>) 
     let frameworksToGenerate =
         let targetFrameworkList = providedFrameworks |> List.choose FrameworkDetection.Extract
         
-        failMatchParameters providedFrameworks targetFrameworkList FrameworkDetection.Extract "Unrecognized Framework(s)"
+        failOnMismatch providedFrameworks targetFrameworkList FrameworkDetection.Extract "Unrecognized Framework(s)"
         
         if targetFrameworkList |> Seq.isEmpty |> not then targetFrameworkList |> Seq.ofList
         else if frameworksForDependencyGroups.Value |> Seq.isEmpty |> not then frameworksForDependencyGroups.Value 
@@ -364,7 +364,7 @@ let generateIncludeScripts (results : ParseResults<GenerateIncludeScriptsArgs>) 
     let scriptTypesToGenerate = 
       let parsedScriptTypes = providedScriptTypes |> List.choose Paket.LoadingScripts.ScriptGeneration.ScriptType.TryCreate
       
-      failMatchParameters providedScriptTypes parsedScriptTypes Paket.LoadingScripts.ScriptGeneration.ScriptType.TryCreate "Unrecognized Script Type(s)"
+      failOnMismatch providedScriptTypes parsedScriptTypes Paket.LoadingScripts.ScriptGeneration.ScriptType.TryCreate "Unrecognized Script Type(s)"
 
       match parsedScriptTypes with
       | [] -> [Paket.LoadingScripts.ScriptGeneration.CSharp; Paket.LoadingScripts.ScriptGeneration.FSharp]
