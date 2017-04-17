@@ -233,13 +233,108 @@ let graph6 =
   </metadata>
 </package>
     """ ]
-    
+
 [<Test>]
 let ``should properly delegate restriction when no global restriction is given``() = 
     let config = """
 source http://www.nuget.org/api/v2
 
 nuget Chessie"""
+    let resolved =
+        DependenciesFile.FromCode(config)
+        |> resolve graph6 UpdateMode.UpdateAll
+    let chessie = resolved.[PackageName "Chessie"]
+    let fsharpCore = resolved.[PackageName "FSharp.Core"]
+    let netStandard = resolved.[PackageName "MyNetStandardDummy"]
+    getVersion chessie |> shouldEqual "0.6.0"
+    // Discuss: Unification properly should take this version, as it is the only one matching all restrictions
+    // But is still feels wrong to take an alpha package here...
+    getVersion fsharpCore |> shouldEqual "4.0.1.7-alpha"
+    getVersion netStandard |> shouldEqual "1.6.0"
+    // Don't install netstandard to net45
+    Requirements.isTargetMatchingRestrictions 
+      (Requirements.getRestrictionList netStandard.Settings.FrameworkRestrictions,
+       (TargetProfile.SinglePlatform (FrameworkIdentifier.DotNetFramework FrameworkVersion.V4_5)))
+      |> shouldEqual false
+    // Don't install netstandard to net463
+    Requirements.isTargetMatchingRestrictions 
+      (Requirements.getRestrictionList netStandard.Settings.FrameworkRestrictions,
+       (TargetProfile.SinglePlatform (FrameworkIdentifier.DotNetFramework FrameworkVersion.V4_6_3)))
+      |> shouldEqual false
+    // This also tests that "UnknownPackage" is not pulled unexpectedly (because this dependency is never relevant)
+
+
+[<Test>]
+let ``should ignore dependencies of a group that was restricted``() =
+    let graph =
+        GraphOfNuspecs [
+            """<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata minClientVersion="3.3">
+    <id>Microsoft.CodeAnalysis.Workspaces.Common</id>
+    <version>2.0.0</version>
+    <authors>Microsoft</authors>
+    <owners>Microsoft</owners>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <licenseUrl>http://go.microsoft.com/fwlink/?LinkId=529443</licenseUrl>
+    <projectUrl>http://msdn.com/roslyn</projectUrl>
+    <description>A shared package used by the .NET Compiler Platform ("Roslyn") including support for analyzing projects and solutions. Do not install this package manually, it will be added as a prerequisite by other packages that require it.</description>
+    <summary>A shared package used by the .NET Compiler Platform ("Roslyn") including support for analyzing projects and solutions.</summary>
+    <releaseNotes></releaseNotes>
+    <language>en-US</language>
+    <tags>Roslyn CodeAnalysis Compiler CSharp VB VisualBasic Parser Scanner Lexer Emit CodeGeneration Metadata IL Compilation Scripting Syntax Semantics</tags>
+    <serviceable>true</serviceable>
+    <dependencies>
+      <group targetFramework=".NETStandard1.3">
+        <dependency id="Microsoft.CodeAnalysis.Common" version="[2.0.0]" />
+      </group>
+      <group targetFramework=".NETFramework4.6">
+        <dependency id="ManagedEsent" version="1.9.4" />
+        <dependency id="Microsoft.CodeAnalysis.Common" version="[2.0.0]" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>"""
+            """<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata minClientVersion="3.3">
+    <id>Microsoft.CodeAnalysis.Common</id>
+    <version>2.0.0</version>
+    <authors>Microsoft</authors>
+    <owners>Microsoft</owners>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <licenseUrl>http://go.microsoft.com/fwlink/?LinkId=529443</licenseUrl>
+    <projectUrl>http://msdn.com/roslyn</projectUrl>
+    <description>A shared package used by the Microsoft .NET Compiler Platform ("Roslyn"). Do not install this package manually, it will be added as a prerequisite by other packages that require it.</description>
+    <summary>A shared package used by the Microsoft .NET Compiler Platform ("Roslyn").</summary>
+    <releaseNotes></releaseNotes>
+    <language>en-US</language>
+    <tags>Roslyn CodeAnalysis Compiler CSharp VB VisualBasic Parser Scanner Lexer Emit CodeGeneration Metadata IL Compilation Scripting Syntax Semantics</tags>
+    <serviceable>true</serviceable>
+    <dependencies>
+      <group targetFramework=".NETStandard1.3">
+      </group>
+    </dependencies>
+  </metadata>
+</package>"""
+            """<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>FSharp.Core</id>
+    <version>4.0.1.7-alpha</version>
+    <dependencies>
+      <group targetFramework=".NETStandard1.6">
+        <dependency id="MyNetStandardDummy" version="[1.6.0, )" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>"""]
+
+
+    let config = """
+source http://www.nuget.org/api/v2
+
+nuget Microsoft.CodeAnalysis.Workspaces.Common framework: netstandard13"""
     let resolved =
         DependenciesFile.FromCode(config)
         |> resolve graph6 UpdateMode.UpdateAll
