@@ -39,6 +39,16 @@ let ``#2294 pin NETStandard.Library = 1.6.0 Strategy Workaround``() =
     |> shouldEqual (SemVer.Parse "1.6")
 
 [<Test>]
+let ``#2289 Paket 4.x install command takes hours to complete``() =
+    let lockFile = install "i002289-resolve-nunit-timeout"
+    let nunitVersion =
+        lockFile.Groups.[Constants.MainDependencyGroup].Resolution.[PackageName "NUnit"].Version
+    nunitVersion
+    |> shouldBeGreaterThan (SemVer.Parse "2.0")
+    nunitVersion
+    |> shouldBeSmallerThan (SemVer.Parse "3.0")
+
+[<Test>]
 [<Ignore("fails with SO, skipping until works")>]
 let ``#1174 Should find Ninject error``() =
     updateShouldFindPackageConflict "Ninject" "i001174-resolve-fast-conflict"
