@@ -47,13 +47,16 @@ If you don't want to import `.targets` and `.props` files you can disable it via
 
 ## No content option
 
-This option disables the installation of any content files for the given package:
+This option allows you to disable the installation of any content files for the given package:
 
     [lang=paket]
     jQuery content: none
-    Fody   content: once // install content files but don't overwrite
-    ServiceStack.Swagger content: true // install content and always override
+    Fody   content: once
+    ServiceStack.Swagger content: true
 
+In this example,
+- `once` will install content files but not overwrite
+- `content: true` will install content and always override
 
 ## Framework restrictions
 
@@ -62,6 +65,18 @@ Sometimes you don't want to generate dependencies for older framework versions. 
     [lang=paket]
     Newtonsoft.Json framework: net35, net40
     DotNetZip framework: >= net45           
+
+> Note: This feature is deprecated and can be seen as an expert feature. 
+> Using framework restrictions on single packages might make you projects uncompilable.
+> The recommended way is to globally (on a group) specifiy the frameworks you want to compile for.
+
+This feature basically tells paket to only consider the specified frameworks for this package on this particular project.
+The resolution will not be modified when restrictions are specified in the reference file.
+It means 
+
+> In this project 'Newtonsoft.Json' is only required when compiling against 'net35' or 'net40'.
+> I never need this package to compile for another framework like 'net45', therefore don't add references for other frameworks.
+
 
 ## Redirects settings
 
