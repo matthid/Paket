@@ -106,3 +106,73 @@ let ``should resolve config with local max requirement``() =
     let cfg = DependenciesFile.FromSource(config4)
     let resolved = ResolveWithGraph(cfg,noSha1,VersionsFromGraphAsSeq graph2, PackageDetailsFromGraph graph2).[Constants.MainDependencyGroup].ResolvedPackages.GetModelOrFail()
     getVersion resolved.[PackageName "Microsoft.AspNet.Mvc"] |> shouldEqual "6.0.13"
+
+
+let config5 = """
+source https://api.nuget.org/v3/index.json
+
+nuget MahApps.Metro 1.0.1-ALPHA027 framework: >= net45
+nuget MahApps.Metro.Resources 0.4 framework: >= net45
+"""   
+let graph3 = 
+  GraphOfNuspecs [
+    """<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/10/nuspec.xsd">
+  <metadata>
+    <id>MahApps.Metro</id>
+    <version>1.0.1-ALPHA027</version>
+    <title>MahApps.Metro</title>
+    <authors>Paul Jenkins; Jake Ginnivan; Brendan Forster (shiftkey); Alex Mitchell (Amrykid); Dennis Daume (flagbug); Jan Karger (punker76)</authors>
+    <owners>Paul Jenkins; Jake Ginnivan</owners>
+    <licenseUrl>http://www.opensource.org/licenses/MS-PL</licenseUrl>
+    <projectUrl>https://github.com/MahApps/MahApps.Metro</projectUrl>
+    <iconUrl>https://raw.githubusercontent.com/MahApps/MahApps.Metro/master/mahapps.metro.logo2.png</iconUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>The goal of MahApps.Metro is to allow devs to quickly and easily cobble together a "Metro" or "Modern" UI for their WPF4+ apps, with minimal effort.</description>
+    <summary>The goal of MahApps.Metro is to allow devs to quickly and easily cobble together a "Metro" or "Modern" UI for their WPF4+ apps, with minimal effort.</summary>
+    <releaseNotes />
+    <tags>WPF UI Metro</tags>
+  </metadata>
+</package>
+    """
+    """<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>MahApps.Metro.Resources</id>
+    <version>0.4.0.0</version>
+    <title>MahApps.Metro.Resources</title>
+    <authors>Paul Jenkins; Brendan Forster (shiftkey); Alex Mitchell (Amrykid); Dennis Daume (flagbug); Jan Karger (punker76); Austin Andrews (Templarian)</authors>
+    <owners>Paul Jenkins</owners>
+    <projectUrl>https://github.com/MahApps/MahApps.Metro</projectUrl>
+    <iconUrl>https://raw.githubusercontent.com/MahApps/MahApps.Metro/master/mahapps.metro.logo2.png</iconUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>"loose" file XAML Resource for Metro UI's.
+      All icons taken from "Modern UI Icons" created by Austin Andrews (Templarian)
+      http://modernuiicons.com
+      https://github.com/Templarian/WindowsIcons</description>
+    <summary>"loose" file XAML Resource for Metro UI's.
+      All icons taken from "Modern UI Icons" created by Austin Andrews (Templarian)
+      http://modernuiicons.com
+      https://github.com/Templarian/WindowsIcons</summary>
+    <tags>WPF XAML UI Icon Metro</tags>
+    <dependencies>
+      <dependency id="MahApps.Metro" version="1.0.0" />
+    </dependencies>
+  </metadata>
+</package>
+    """
+  ]
+
+
+[<Test>]
+let ``i002326 invalid resolutions because of alpha package should show propper error message``() = 
+    let cfg = DependenciesFile.FromSource(config4)
+    
+    try
+        ResolveWithGraph(cfg,noSha1,VersionsFromGraphAsSeq graph3, PackageDetailsFromGraph graph3).[Constants.MainDependencyGroup].ResolvedPackages.GetModelOrFail()
+        |> ignore
+        
+        Assert.Fail("Expected an error")
+    with e -> 
+        e.Message
+        |> shouldContainText "cannot resolve because"
